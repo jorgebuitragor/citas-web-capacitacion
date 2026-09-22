@@ -66,7 +66,7 @@ export default function App() {
             <h1 id="auth-title">{screen === 'login' ? 'Bienvenido' : 'Crea tu cuenta'}</h1>
             <p className="intro">{screen === 'login' ? 'Ingresa para gestionar tus citas de forma sencilla y segura.' : 'Regístrate con datos sintéticos para acceder al sistema de agendamiento.'}</p>
 
-            {notice && <div className={`notice ${notice.type}`} role="status">{notice.text}</div>}
+            {notice && <div className={`notice ${notice.type}`} role={notice.type === 'error' ? 'alert' : 'status'}>{notice.text}</div>}
 
             {screen === 'login' ? (
               <form onSubmit={submitLogin} className="auth-form">

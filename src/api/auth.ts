@@ -1,4 +1,5 @@
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+// Keep the browser client aligned with the public Vite environment contract.
+const apiBaseUrl = import.meta.env.VITE_API_URL as string | undefined;
 const API_BASE_URL = apiBaseUrl?.replace(/\/$/, '') ?? 'http://localhost:8080';
 
 export type ApiProblem = { title?: string; detail?: string; errors?: Array<{ field: string; message: string }> };
