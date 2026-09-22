@@ -1,0 +1,6 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "web-design-governance",
+  "version": "1.0.0",
+  "description": "Preserva y evoluciona de forma consistente el diseño aprobado de citas-web al ajustar su interfaz."
+}

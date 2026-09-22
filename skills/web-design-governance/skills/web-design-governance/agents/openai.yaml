@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web Design Governance"
+  short_description: "Keep citas-web UI changes visually consistent."
+  default_prompt: "Use $web-design-governance to adjust this citas-web interface while preserving its current approved visual system."
+policy:
+  allow_implicit_invocation: true
