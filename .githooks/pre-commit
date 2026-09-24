@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+set -eu
+
+for file in $(git diff --cached --name-only --diff-filter=ACMR); do
+  [ -f "$file" ] || continue
+  if git show ":$file" | grep -E -q '(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|-----BEGIN( RSA| EC)? PRIVATE KEY-----)'; then
+    echo "Secret-like value blocked in staged file: $file" >&2
+    exit 1
+  fi
+done
+
+npm run typecheck
+npm test
+npm run build

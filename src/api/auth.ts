@@ -1,6 +1,6 @@
 // Keep the browser client aligned with the public Vite environment contract.
 const apiBaseUrl = import.meta.env.VITE_API_URL as string | undefined;
-const API_BASE_URL = apiBaseUrl?.replace(/\/$/, '') ?? 'http://localhost:8080';
+const API_BASE_URL = apiBaseUrl?.replace(/\/$/, '') ?? '';
 
 export type ApiProblem = { title?: string; detail?: string; errors?: Array<{ field: string; message: string }> };
 export type LoginResponse = { accessToken: string; tokenType: 'Bearer'; accessExpiresAt: string; csrfToken: string };
@@ -24,4 +24,8 @@ export function registerUser(payload: { firstName: string; lastName: string; doc
 
 export function login(payload: { email: string; password: string }) {
   return request<LoginResponse>('/api/v1/auth/login', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function currentSession(accessToken: string) {
+  return request<{ subject: string; roles: string[] }>('/api/v1/auth/me', { method: 'GET', headers: { Authorization: `Bearer ${accessToken}` } });
 }
