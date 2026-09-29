@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminDashboard, BookingDashboard } from './App';
 
 const response = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }));
 
 describe('S3 booking screens', () => {
-  beforeEach(() => { vi.restoreAllMocks(); });
+  beforeEach(() => { cleanup(); vi.restoreAllMocks(); });
 
   it('filters availability and confirms a general appointment', async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -30,6 +30,23 @@ describe('S3 booking screens', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar franja' }));
     expect(await screen.findByText('Tu cita quedó aprobada automáticamente.')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/appointments'), expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('explains when the selected location and specialty have no professionals', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.includes('/locations')) return response([{ id: '2', code: 'ICV', name: 'ICV' }]);
+      if (url.includes('/specialties')) return response([{ id: '1', code: 'MEDICINA_GENERAL', name: 'Medicina General', durationMinutes: 30, general: true, requiresAdminApproval: false }]);
+      if (url.includes('/professionals')) return response([]);
+      return response({ title: 'Unexpected request' }, 500);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<BookingDashboard token="token" isAdmin={false} onAdmin={vi.fn()} onSignOut={vi.fn()} />);
+    await screen.findByRole('option', { name: 'ICV' });
+    fireEvent.change(screen.getByLabelText('Sede'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Especialidad'), { target: { value: '1' } });
+
+    expect(await screen.findByText('No hay profesionales disponibles para esta sede y especialidad.')).toBeInTheDocument();
   });
 
   it('requires a reason before rejecting a pending specialized appointment', async () => {
