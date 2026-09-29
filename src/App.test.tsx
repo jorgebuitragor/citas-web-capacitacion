@@ -64,4 +64,19 @@ describe('S3 booking screens', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/decision'), expect.objectContaining({ method: 'POST' })));
   });
+
+  it('does not announce an empty result before the first search', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.includes('/locations')) return response([{ id: '1', code: 'HIC', name: 'HIC' }]);
+      if (url.includes('/specialties')) return response([{ id: '1', code: 'MEDICINA_GENERAL', name: 'Medicina General', durationMinutes: 30, general: true, requiresAdminApproval: false }]);
+      return response({ title: 'Unexpected request' }, 500);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<BookingDashboard token="token" isAdmin={false} onAdmin={vi.fn()} onSignOut={vi.fn()} />);
+
+    expect(await screen.findByText('Aún no has buscado franjas')).toBeInTheDocument();
+    expect(screen.queryByText('No hay franjas para esos filtros')).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/availability'), expect.anything());
+  });
 });
