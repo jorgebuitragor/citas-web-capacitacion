@@ -14,12 +14,22 @@ const pending: RescheduleRequest = {
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
+// HU-024: InboxFilterBar carga catálogos de sede/especialidad al montar; estas pruebas
+// no ejercitan los filtros, así que responden listas vacías para esas dos rutas.
+function mockFetch(onRequest: (url: string, init?: RequestInit) => Response) {
+  return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes('/catalogs/locations') || url.includes('/catalogs/specialties')) return response([]);
+    return onRequest(url, init);
+  });
+}
+
 describe('RescheduleInbox', () => {
   beforeEach(() => { vi.restoreAllMocks(); });
   afterEach(() => { cleanup(); });
 
   it('lists the pending requests comparing both slots', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => response({ items: [pending] })));
+    vi.stubGlobal('fetch', mockFetch(() => response({ items: [pending] })));
     render(<RescheduleInbox token="admin-token" />);
     expect(await screen.findByText(/Franja actual/)).toBeInTheDocument();
     expect(screen.getByText(/Franja solicitada/)).toBeInTheDocument();
@@ -27,7 +37,7 @@ describe('RescheduleInbox', () => {
   });
 
   it('blocks a rejection without reason and sends it once filled', async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = mockFetch((_url, init) => {
       if (init?.method === 'POST') return response({ ...pending, status: 'REJECTED', decisionReason: 'Sin disponibilidad.' });
       return response({ items: [pending] });
     });
@@ -46,7 +56,7 @@ describe('RescheduleInbox', () => {
   });
 
   it('approves without a reason and reports the new slot', async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = mockFetch((_url, init) => {
       if (init?.method === 'POST') return response({ ...pending, status: 'APPROVED' });
       return response({ items: [pending] });
     });
@@ -59,7 +69,7 @@ describe('RescheduleInbox', () => {
   });
 
   it('reports a decision error and reloads the inbox', async () => {
-    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = mockFetch((_url, init) => {
       if (init?.method === 'POST') return response({ status: 409, title: 'Conflicto', detail: 'La solicitud ya fue decidida.' }, 409);
       return response({ items: [pending] });
     });
@@ -67,11 +77,12 @@ describe('RescheduleInbox', () => {
     render(<RescheduleInbox token="admin-token" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
     expect(await screen.findByText('La solicitud ya fue decidida.')).toBeInTheDocument();
-    await waitFor(() => expect(fetchMock.mock.calls.filter((call) => (call[1] as RequestInit | undefined)?.method !== 'POST')).toHaveLength(2));
+    const inboxReloads = () => fetchMock.mock.calls.filter((call) => String(call[0]).includes('/admin/reschedule-requests') && (call[1] as RequestInit | undefined)?.method !== 'POST');
+    await waitFor(() => expect(inboxReloads()).toHaveLength(2));
   });
 
   it('shows an empty state when there is nothing pending', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => response({ items: [] })));
+    vi.stubGlobal('fetch', mockFetch(() => response({ items: [] })));
     render(<RescheduleInbox token="admin-token" />);
     expect(await screen.findByText('No hay reprogramaciones pendientes.')).toBeInTheDocument();
   });

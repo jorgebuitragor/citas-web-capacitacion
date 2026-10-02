@@ -48,6 +48,17 @@ export type AgendaAppointment = Appointment & {
   specialty: { id: string; name: string };
   closureAllowed: boolean;
 };
+export type StatusSource = 'SYSTEM' | 'USER' | 'ADMIN';
+export type StatusHistoryEvent = {
+  id: string;
+  appointmentId: string;
+  status: AppointmentStatus;
+  actor: { id: string; name: string } | null;
+  source: StatusSource;
+  changedAt: string;
+  reason: string | null;
+};
+export type AdminInboxFilters = { locationId?: string; professionalId?: string; specialtyId?: string; date?: string };
 
 async function request<T>(path: string, token: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -72,7 +83,14 @@ export const bookingApi = {
     request<{ items: Availability[] }>(`/api/v1/availability?locationId=${encodeURIComponent(filters.locationId)}&specialtyId=${encodeURIComponent(filters.specialtyId)}&professionalId=${encodeURIComponent(filters.professionalId)}&date=${encodeURIComponent(filters.date)}`, token),
   create: (token: string, requestBody: { locationId: string; specialtyId: string; professionalId: string; startAt: string }) =>
     request<Appointment>('/api/v1/appointments', token, { method: 'POST', body: JSON.stringify(requestBody) }),
-  pending: (token: string) => request<PendingAppointment[]>('/api/v1/admin/appointments?status=REQUESTED', token),
+  pending: (token: string, filters: AdminInboxFilters = {}) => {
+    const params = new URLSearchParams({ status: 'REQUESTED' });
+    if (filters.locationId) params.set('locationId', filters.locationId);
+    if (filters.professionalId) params.set('professionalId', filters.professionalId);
+    if (filters.specialtyId) params.set('specialtyId', filters.specialtyId);
+    if (filters.date) params.set('date', filters.date);
+    return request<PendingAppointment[]>(`/api/v1/admin/appointments?${params.toString()}`, token);
+  },
   decide: (token: string, id: string, decision: 'APPROVE' | 'REJECT', reason?: string) =>
     request<Appointment>(`/api/v1/admin/appointments/${encodeURIComponent(id)}/decision`, token, { method: 'POST', body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }) }),
   myAppointments: (token: string, filters: { status: AppointmentStatus | ''; date: string }) => {
@@ -87,8 +105,16 @@ export const bookingApi = {
   requestReschedule: (token: string, appointmentId: string, body: { locationId: string; specialtyId: string; professionalId: string; startAt: string }) =>
     request<RescheduleRequest>(`/api/v1/appointments/${encodeURIComponent(appointmentId)}/reschedule-requests`, token,
       { method: 'POST', body: JSON.stringify(body) }),
-  rescheduleRequests: (token: string, status: RescheduleStatus = 'PENDING') =>
-    request<{ items: RescheduleRequest[] }>(`/api/v1/admin/reschedule-requests?status=${encodeURIComponent(status)}`, token),
+  rescheduleRequests: (token: string, status: RescheduleStatus = 'PENDING', filters: AdminInboxFilters = {}) => {
+    const params = new URLSearchParams({ status });
+    if (filters.locationId) params.set('locationId', filters.locationId);
+    if (filters.professionalId) params.set('professionalId', filters.professionalId);
+    if (filters.specialtyId) params.set('specialtyId', filters.specialtyId);
+    if (filters.date) params.set('date', filters.date);
+    return request<{ items: RescheduleRequest[] }>(`/api/v1/admin/reschedule-requests?${params.toString()}`, token);
+  },
+  statusHistory: (token: string, appointmentId: string) =>
+    request<{ items: StatusHistoryEvent[] }>(`/api/v1/appointments/${encodeURIComponent(appointmentId)}/status-history`, token),
   decideReschedule: (token: string, id: string, decision: 'APPROVE' | 'REJECT', reason?: string) =>
     request<RescheduleRequest>(`/api/v1/admin/reschedule-requests/${encodeURIComponent(id)}/decision`, token,
       { method: 'POST', body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }) }),

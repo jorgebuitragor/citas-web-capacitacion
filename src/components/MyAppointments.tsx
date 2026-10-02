@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Availability, AppointmentStatus, bookingApi, Location, MyAppointment } from '../api/booking';
+import { StatusHistoryToggle } from './StatusHistory';
 
 type Notice = { type: 'error' | 'success'; text: string } | null;
 type Props = { token: string; onSignOut: () => void; onBooking: () => void };
@@ -147,7 +148,7 @@ export function MyAppointmentsDashboard({ token, onSignOut, onBooking }: Props) 
       </form>
       <section aria-live="polite" aria-busy={loading} className="appointments-results">
         <div className="results-toolbar"><div><span className="filter-kicker">TU AGENDA</span><h2>Resumen de citas</h2></div><div className="view-switch" role="group" aria-label="Vista de citas"><button className={view === 'list' ? 'selected' : ''} aria-pressed={view === 'list'} onClick={() => setView('list')}><span aria-hidden="true">☷</span> Lista</button><button className={view === 'calendar' ? 'selected' : ''} aria-pressed={view === 'calendar'} onClick={() => setView('calendar')}><span aria-hidden="true">▦</span> Calendario</button></div></div>
-        {loading ? <div className="appointments-list"><AppointmentSkeleton /><AppointmentSkeleton /></div> : loadError ? <div className="empty-state error-panel" role="alert"><h2>No pudimos cargar tus citas</h2><p>{loadError}</p><button className="primary-button" onClick={() => void load(appliedFilters)}>Reintentar</button></div> : items.length === 0 ? <div className="empty-state"><span className="empty-calendar-icon" aria-hidden="true">▦</span><h2>No tienes citas para estos filtros</h2><p>Cuando tengas una cita, aparecerá aquí. También puedes probar con otros filtros.</p><button className="secondary-button" onClick={clearFilters}>Limpiar filtros</button></div> : view === 'calendar' ? <AppointmentCalendar items={items} month={calendarMonth} selectedDate={selectedCalendarDate} onMonthChange={setCalendarMonth} onSelectDate={setSelectedCalendarDate} onCancel={(item, button) => { cancelTrigger.current = button; setCancelTarget(item); setCancelMode('confirm'); }} onReschedule={(item, button) => { rescheduleTrigger.current = button; setRescheduleTarget(item); }} /> : <div className="appointments-list">{items.map((item) => <AppointmentCard key={item.id} item={item} onCancel={(button) => { cancelTrigger.current = button; setCancelTarget(item); setCancelMode('confirm'); }} onReschedule={(button) => { rescheduleTrigger.current = button; setRescheduleTarget(item); }} />)}</div>}
+        {loading ? <div className="appointments-list"><AppointmentSkeleton /><AppointmentSkeleton /></div> : loadError ? <div className="empty-state error-panel" role="alert"><h2>No pudimos cargar tus citas</h2><p>{loadError}</p><button className="primary-button" onClick={() => void load(appliedFilters)}>Reintentar</button></div> : items.length === 0 ? <div className="empty-state"><span className="empty-calendar-icon" aria-hidden="true">▦</span><h2>No tienes citas para estos filtros</h2><p>Cuando tengas una cita, aparecerá aquí. También puedes probar con otros filtros.</p><button className="secondary-button" onClick={clearFilters}>Limpiar filtros</button></div> : view === 'calendar' ? <AppointmentCalendar items={items} month={calendarMonth} selectedDate={selectedCalendarDate} onMonthChange={setCalendarMonth} onSelectDate={setSelectedCalendarDate} onCancel={(item, button) => { cancelTrigger.current = button; setCancelTarget(item); setCancelMode('confirm'); }} onReschedule={(item, button) => { rescheduleTrigger.current = button; setRescheduleTarget(item); }} /> : <div className="appointments-list">{items.map((item) => <AppointmentCard key={item.id} token={token} item={item} onCancel={(button) => { cancelTrigger.current = button; setCancelTarget(item); setCancelMode('confirm'); }} onReschedule={(button) => { rescheduleTrigger.current = button; setRescheduleTarget(item); }} />)}</div>}
       </section>
     </main>
     {rescheduleTarget && <RescheduleDialog token={token} appointment={rescheduleTarget}
@@ -162,8 +163,8 @@ export function MyAppointmentsDashboard({ token, onSignOut, onBooking }: Props) 
   </div>;
 }
 
-function AppointmentCard({ item, onCancel, onReschedule }: {
-  item: MyAppointment; onCancel: (button: HTMLButtonElement) => void; onReschedule: (button: HTMLButtonElement) => void;
+function AppointmentCard({ token, item, onCancel, onReschedule }: {
+  token: string; item: MyAppointment; onCancel: (button: HTMLButtonElement) => void; onReschedule: (button: HTMLButtonElement) => void;
 }) {
   return <article className="appointment-card">
     <div className="appointment-heading"><div><p className="appointment-date">{formatDateTime(item.startAt)}</p><p className="appointment-duration">{item.durationMinutes} minutos</p></div><span className={`status-badge status-${item.status.toLowerCase()}`}><span aria-hidden="true">{statusSymbol(item.status)}</span> {statusLabels[item.status]}</span></div>
@@ -174,6 +175,7 @@ function AppointmentCard({ item, onCancel, onReschedule }: {
       {item.rescheduleAllowed && <button className="secondary-button" onClick={(event) => onReschedule(event.currentTarget)}>Reprogramar</button>}
       {item.cancellationAllowed && <button className="danger-button" onClick={(event) => onCancel(event.currentTarget)}>Cancelar cita</button>}
     </div>
+    <StatusHistoryToggle token={token} appointmentId={item.id} />
   </article>;
 }
 

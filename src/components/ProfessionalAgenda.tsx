@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { AgendaAppointment, AppointmentStatus, bookingApi, Location } from '../api/booking';
+import { StatusHistoryToggle } from './StatusHistory';
 
 type Notice = { type: 'error' | 'success'; text: string } | null;
 type Props = { token: string; onSignOut: () => void };
@@ -149,7 +150,7 @@ export function ProfessionalAgendaDashboard({ token, onSignOut }: Props) {
             ? <div className="empty-state error-panel" role="alert"><h2>No pudimos cargar tu agenda</h2><p>{loadError}</p><button className="primary-button" onClick={() => void load(appliedFilters)}>Reintentar</button></div>
             : items.length === 0
               ? <div className="empty-state"><span className="empty-calendar-icon" aria-hidden="true">▦</span><h2>No tienes citas para estos filtros</h2><p>Cuando tengas una cita aprobada en este periodo, aparecerá aquí.</p><button className="secondary-button" onClick={clearFilters}>Limpiar filtros</button></div>
-              : <div className="appointments-list">{items.map((item) => <AgendaCard key={item.id} item={item} onClose={(button) => { closeTrigger.current = button; setCloseTarget(item); setCloseMode('confirm'); }} />)}</div>}
+              : <div className="appointments-list">{items.map((item) => <AgendaCard key={item.id} token={token} item={item} onClose={(button) => { closeTrigger.current = button; setCloseTarget(item); setCloseMode('confirm'); }} />)}</div>}
       </section>
     </main>
     {closeTarget && closeMode && <div className="dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(); }}><section ref={dialog} tabIndex={-1} onKeyDown={handleDialogKeyDown} className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="close-title" aria-describedby="close-description">
@@ -161,11 +162,12 @@ export function ProfessionalAgendaDashboard({ token, onSignOut }: Props) {
   </div>;
 }
 
-function AgendaCard({ item, onClose }: { item: AgendaAppointment; onClose: (button: HTMLButtonElement) => void }) {
+function AgendaCard({ token, item, onClose }: { token: string; item: AgendaAppointment; onClose: (button: HTMLButtonElement) => void }) {
   return <article className="appointment-card">
     <div className="appointment-heading"><div><p className="appointment-date">{formatDateTime(item.startAt)}</p><p className="appointment-duration">{item.durationMinutes} minutos</p></div><span className={`status-badge status-${item.status.toLowerCase()}`}><span aria-hidden="true">{statusSymbol(item.status)}</span> {statusLabels[item.status]}</span></div>
     <div className="appointment-details"><p><strong>Paciente</strong>{item.patientName}</p><p><strong>Especialidad</strong>{item.specialty.name}</p><p><strong>Sede</strong>{item.location.name}</p></div>
     {item.closureAllowed && <button className="primary-button" onClick={(event) => onClose(event.currentTarget)}>Marcar atención</button>}
+    <StatusHistoryToggle token={token} appointmentId={item.id} />
   </article>;
 }
 

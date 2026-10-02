@@ -1,9 +1,10 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { currentSession, login, registerUser } from './api/auth';
-import { bookingApi, PendingAppointment, RescheduleRequest } from './api/booking';
+import { AdminInboxFilters, bookingApi, Location, PendingAppointment, RescheduleRequest, Specialty } from './api/booking';
 import { MyAppointmentsDashboard } from './components/MyAppointments';
 import { ProfessionalAgendaDashboard } from './components/ProfessionalAgenda';
 import { BookingDashboard } from './components/BookingSearch';
+import { StatusHistoryToggle } from './components/StatusHistory';
 export { BookingDashboard };
 
 type Screen = 'login' | 'register' | 'booking' | 'appointments' | 'admin' | 'agenda';
@@ -49,12 +50,30 @@ export default function App() {
   return <div className="app-shell"><header className="topbar"><button className="brand" onClick={() => changeScreen('login')} aria-label="Ir a inicio"><span className="brand-mark">✚</span><span>MediSchedule</span></button><nav aria-label="Acceso"><button className={screen === 'login' ? 'nav-active' : ''} onClick={() => changeScreen('login')}>Iniciar sesión</button><button className={screen === 'register' ? 'nav-active' : ''} onClick={() => changeScreen('register')}>Crear cuenta</button></nav></header><main className="auth-layout"><section className="form-pane" aria-labelledby="auth-title"><div className="form-content"><p className="eyebrow">PORTAL DE CITAS</p><h1 id="auth-title">{screen === 'login' ? 'Bienvenido' : 'Crea tu cuenta'}</h1><p className="intro">{screen === 'login' ? 'Ingresa para consultar y solicitar tus citas.' : 'Regístrate con datos sintéticos para acceder al sistema de agendamiento.'}</p>{notice && <NoticeBox notice={notice} />}{screen === 'login' ? <form onSubmit={submitLogin} className="auth-form"><Field label="Correo electrónico" htmlFor="login-email"><input id="login-email" type="email" required autoComplete="email" value={loginForm.email} onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })} placeholder="nombre@ejemplo.com" /></Field><Field label="Contraseña" htmlFor="login-password"><div className="password-wrap"><input id="login-password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password" value={loginForm.password} onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })} placeholder="••••••••" /><button type="button" className="reveal" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showPassword ? 'Ocultar' : 'Mostrar'}</button></div></Field><button className="primary-button" disabled={submitting}>{submitting ? 'Autenticando…' : 'Iniciar sesión'} <span>→</span></button><p className="switch-copy">¿No tienes cuenta? <button type="button" onClick={() => changeScreen('register')}>Regístrate</button></p></form> : <form onSubmit={submitRegistration} className="auth-form register-form"><div className="two-columns"><Field label="Nombres" htmlFor="first-name"><input id="first-name" required value={registration.firstName} onChange={(event) => setRegistration({ ...registration, firstName: event.target.value })} /></Field><Field label="Apellidos" htmlFor="last-name"><input id="last-name" required value={registration.lastName} onChange={(event) => setRegistration({ ...registration, lastName: event.target.value })} /></Field></div><div className="two-columns"><Field label="Tipo de documento" htmlFor="document-type"><select id="document-type" value={registration.documentType} onChange={(event) => setRegistration({ ...registration, documentType: event.target.value })}><option value="CC">Cédula de ciudadanía</option><option value="CE">Cédula de extranjería</option><option value="PA">Pasaporte</option></select></Field><Field label="Número de documento" htmlFor="document-number"><input id="document-number" required value={registration.documentNumber} onChange={(event) => setRegistration({ ...registration, documentNumber: event.target.value })} /></Field></div><Field label="Correo electrónico" htmlFor="register-email"><input id="register-email" type="email" required value={registration.email} onChange={(event) => setRegistration({ ...registration, email: event.target.value })} placeholder="nombre@ejemplo.com" /></Field><Field label="Teléfono" htmlFor="phone"><input id="phone" required value={registration.phone} onChange={(event) => setRegistration({ ...registration, phone: event.target.value })} placeholder="300 000 0000" /></Field><div className="two-columns"><Field label="Contraseña" htmlFor="register-password"><input id="register-password" type="password" required minLength={8} value={registration.password} onChange={(event) => setRegistration({ ...registration, password: event.target.value })} /></Field><Field label="Confirmar contraseña" htmlFor="confirm-password"><input id="confirm-password" type="password" required minLength={8} value={registration.confirmPassword} onChange={(event) => setRegistration({ ...registration, confirmPassword: event.target.value })} /></Field></div><button className="primary-button" disabled={submitting}>{submitting ? 'Creando cuenta…' : 'Crear cuenta'} <span>→</span></button><p className="switch-copy">¿Ya tienes cuenta? <button type="button" onClick={() => changeScreen('login')}>Inicia sesión</button></p></form>}<div className="trust-row"><span>✓ Conexión protegida</span><span>•</span><span>Datos sintéticos de laboratorio</span></div></div></section><aside className="visual-pane" aria-label="Información de la plataforma"><div className="visual-copy"><span className="pill">Atención organizada</span><h2>Tu bienestar empieza con una cita bien agendada.</h2><p>Consulta tus opciones y gestiona tus datos de acceso en un entorno académico protegido.</p></div><div className="quote-card"><span className="quote-icon">“</span><p>Una experiencia clara para hacer más simple cada paso de tu atención.</p></div></aside></main><footer><span>© 2026 MediSchedule · Proyecto académico</span><span>Privacidad · Ayuda</span></footer></div>;
 }
 
+/**
+ * HU-024. Filtros opcionales por sede, especialidad y fecha sobre la bandeja ADMIN
+ * (el backend también admite professionalId; se omite aquí para mantener la UI simple).
+ */
+function InboxFilterBar({ token, filters, onChange }: { token: string; filters: AdminInboxFilters; onChange: (next: AdminInboxFilters) => void }) {
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  useEffect(() => { Promise.all([bookingApi.locations(token), bookingApi.specialties(token)]).then(([nextLocations, nextSpecialties]) => { setLocations(nextLocations); setSpecialties(nextSpecialties); }).catch(() => { /* Los filtros quedan vacíos; la bandeja sigue funcionando sin ellos. */ }); }, [token]);
+  const hasFilters = Boolean(filters.locationId || filters.specialtyId || filters.date);
+  return <div className="filter-row" role="search" aria-label="Filtros de bandeja">
+    <label className="inline-field">Sede<select value={filters.locationId ?? ''} onChange={(event) => onChange({ ...filters, locationId: event.target.value || undefined })}><option value="">Todas</option>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></label>
+    <label className="inline-field">Especialidad<select value={filters.specialtyId ?? ''} onChange={(event) => onChange({ ...filters, specialtyId: event.target.value || undefined })}><option value="">Todas</option>{specialties.map((specialty) => <option key={specialty.id} value={specialty.id}>{specialty.name}</option>)}</select></label>
+    <label className="inline-field">Fecha<input type="date" value={filters.date ?? ''} onChange={(event) => onChange({ ...filters, date: event.target.value || undefined })} /></label>
+    {hasFilters && <button type="button" onClick={() => onChange({})}>Limpiar filtros</button>}
+  </div>;
+}
+
 export function AdminDashboard({ token, onSignOut, onBooking, isUser }: { token: string; onSignOut: () => void; onBooking: () => void; isUser: boolean }) {
   const [items, setItems] = useState<PendingAppointment[]>([]); const [notice, setNotice] = useState<Notice>(null); const [loading, setLoading] = useState(true); const [reasons, setReasons] = useState<Record<string, string>>({});
-  const load = () => { setLoading(true); bookingApi.pending(token).then(setItems).catch((error) => setNotice({ type: 'error', text: error instanceof Error ? error.message : 'No fue posible cargar solicitudes.' })).finally(() => setLoading(false)); };
-  useEffect(load, [token]);
+  const [filters, setFilters] = useState<AdminInboxFilters>({});
+  const load = useCallback(() => { setLoading(true); bookingApi.pending(token, filters).then(setItems).catch((error) => setNotice({ type: 'error', text: error instanceof Error ? error.message : 'No fue posible cargar solicitudes.' })).finally(() => setLoading(false)); }, [token, filters]);
+  useEffect(load, [load]);
   async function decide(item: PendingAppointment, decision: 'APPROVE' | 'REJECT') { const reason = reasons[item.id]?.trim(); if (decision === 'REJECT' && !reason) { setNotice({ type: 'error', text: 'El motivo es obligatorio para rechazar.' }); return; } try { await bookingApi.decide(token, item.id, decision, reason); setNotice({ type: 'success', text: decision === 'APPROVE' ? 'Solicitud aprobada.' : 'Solicitud rechazada y franja liberada.' }); load(); } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : 'No fue posible decidir la solicitud.' }); } }
-  return <PortalLayout title="Solicitudes pendientes" onSignOut={onSignOut} action={isUser ? <button onClick={onBooking}>Buscar cita</button> : undefined}>{notice && <NoticeBox notice={notice} />}<section aria-labelledby="specialized-heading"><h2 id="specialized-heading">Solicitudes de cita especializada</h2>{loading ? <p>Cargando solicitudes…</p> : items.length === 0 ? <p>No hay solicitudes especializadas pendientes.</p> : <div className="pending-list">{items.map((item) => <article className="pending-card" key={item.id}><h3>{item.specialtyName}</h3><p>{item.patientName} · {item.professionalName}</p><p>{item.locationName} · {formatDateTime(item.startAt)} · {item.durationMinutes} min</p><div className="decision-row"><button className="primary-button" onClick={() => decide(item, 'APPROVE')}>Aprobar</button><label className="inline-field">Motivo de rechazo<input aria-label={`Motivo de rechazo para ${item.id}`} value={reasons[item.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [item.id]: event.target.value })} /></label><button className="danger-button" disabled={!reasons[item.id]?.trim()} onClick={() => decide(item, 'REJECT')}>Rechazar</button></div></article>)}</div>}</section><RescheduleInbox token={token} /></PortalLayout>;
+  return <PortalLayout title="Solicitudes pendientes" onSignOut={onSignOut} action={isUser ? <button onClick={onBooking}>Buscar cita</button> : undefined}>{notice && <NoticeBox notice={notice} />}<section aria-labelledby="specialized-heading"><h2 id="specialized-heading">Solicitudes de cita especializada</h2><InboxFilterBar token={token} filters={filters} onChange={setFilters} />{loading ? <p>Cargando solicitudes…</p> : items.length === 0 ? <p>No hay solicitudes especializadas pendientes.</p> : <div className="pending-list">{items.map((item) => <article className="pending-card" key={item.id}><h3>{item.specialtyName}</h3><p>{item.patientName} · {item.professionalName}</p><p>{item.locationName} · {formatDateTime(item.startAt)} · {item.durationMinutes} min</p><div className="decision-row"><button className="primary-button" onClick={() => decide(item, 'APPROVE')}>Aprobar</button><label className="inline-field">Motivo de rechazo<input aria-label={`Motivo de rechazo para ${item.id}`} value={reasons[item.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [item.id]: event.target.value })} /></label><button className="danger-button" disabled={!reasons[item.id]?.trim()} onClick={() => decide(item, 'REJECT')}>Rechazar</button></div><StatusHistoryToggle token={token} appointmentId={item.id} /></article>)}</div>}</section><RescheduleInbox token={token} /></PortalLayout>;
 }
 
 /**
@@ -67,12 +86,13 @@ export function RescheduleInbox({ token }: { token: string }) {
   const [notice, setNotice] = useState<Notice>(null);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [deciding, setDeciding] = useState<string | null>(null);
+  const [filters, setFilters] = useState<AdminInboxFilters>({});
   const load = useCallback(() => {
     setLoading(true);
-    bookingApi.rescheduleRequests(token).then((response) => setItems(response.items))
+    bookingApi.rescheduleRequests(token, 'PENDING', filters).then((response) => setItems(response.items))
       .catch((error) => setNotice({ type: 'error', text: error instanceof Error ? error.message : 'No fue posible cargar las reprogramaciones.' }))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, filters]);
   useEffect(load, [load]);
 
   async function decide(item: RescheduleRequest, decision: 'APPROVE' | 'REJECT') {
@@ -95,6 +115,7 @@ export function RescheduleInbox({ token }: { token: string }) {
 
   return <section aria-labelledby="reschedule-heading" className="reschedule-inbox">
     <h2 id="reschedule-heading">Reprogramaciones pendientes</h2>
+    <InboxFilterBar token={token} filters={filters} onChange={setFilters} />
     {notice && <NoticeBox notice={notice} />}
     {loading ? <p>Cargando reprogramaciones…</p> : items.length === 0 ? <p>No hay reprogramaciones pendientes.</p> : <div className="pending-list">
       {items.map((item) => <article className="pending-card reschedule-card" key={item.id}>
@@ -111,6 +132,7 @@ export function RescheduleInbox({ token }: { token: string }) {
           <label className="inline-field">Motivo<input aria-label={`Motivo de rechazo para la reprogramación ${item.id}`} value={reasons[item.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [item.id]: event.target.value })} /><small>Obligatorio para rechazar</small></label>
           <button className="danger-button" disabled={deciding === item.id || !reasons[item.id]?.trim()} onClick={() => void decide(item, 'REJECT')}>Rechazar</button>
         </div>
+        <StatusHistoryToggle token={token} appointmentId={item.appointmentId} />
       </article>)}
     </div>}
   </section>;
