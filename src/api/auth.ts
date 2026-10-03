@@ -15,7 +15,8 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     const problem = await response.json().catch(() => ({})) as ApiProblem;
     throw new Error(problem.detail ?? problem.title ?? 'No fue posible completar la solicitud.');
   }
-  return response.status === 204 ? undefined as T : response.json() as Promise<T>;
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export function registerUser(payload: { firstName: string; lastName: string; documentType: string; documentNumber: string; email: string; phone: string; password: string }) {
@@ -28,4 +29,13 @@ export function login(payload: { email: string; password: string }) {
 
 export function currentSession(accessToken: string) {
   return request<{ subject: string; roles: string[] }>('/api/v1/auth/me', { method: 'GET', headers: { Authorization: `Bearer ${accessToken}` } });
+}
+
+/** HU-004 (DEC-008). Responde 202 siempre; el token nunca viaja en esta respuesta. */
+export function requestPasswordReset(email: string) {
+  return request<void>('/api/v1/auth/password-reset/request', { method: 'POST', body: JSON.stringify({ email }) });
+}
+
+export function confirmPasswordReset(payload: { token: string; newPassword: string }) {
+  return request<void>('/api/v1/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify(payload) });
 }
