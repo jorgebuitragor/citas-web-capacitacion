@@ -57,7 +57,7 @@ describe('S3 booking screens', () => {
       return response({ title: 'Unexpected request' }, 500);
     });
     vi.stubGlobal('fetch', fetchMock);
-    render(<AdminDashboard token="token" isUser={false} onBooking={vi.fn()} onSignOut={vi.fn()} />);
+    render(<AdminDashboard token="token" isUser={false} onBooking={vi.fn()} onCatalogs={vi.fn()} onSignOut={vi.fn()} />);
     await screen.findByText('Cardiología');
     expect(screen.getByRole('button', { name: 'Rechazar' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Motivo de rechazo para 9'), { target: { value: 'Motivo válido' } });

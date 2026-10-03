@@ -5,10 +5,11 @@ import { MyAppointmentsDashboard } from './components/MyAppointments';
 import { ProfessionalAgendaDashboard } from './components/ProfessionalAgenda';
 import { BookingDashboard } from './components/BookingSearch';
 import { StatusHistoryToggle } from './components/StatusHistory';
+import { CatalogsDashboard } from './components/CatalogAdmin';
 export { BookingDashboard };
 
-type Screen = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'booking' | 'appointments' | 'admin' | 'agenda';
-type Notice = { type: 'error' | 'success'; text: string } | null;
+type Screen = 'login' | 'register' | 'forgot-password' | 'reset-password' | 'booking' | 'appointments' | 'admin' | 'agenda' | 'catalogs';
+export type Notice = { type: 'error' | 'success'; text: string } | null;
 const initialRegistration = { firstName: '', lastName: '', documentType: 'CC', documentNumber: '', email: '', phone: '', password: '', confirmPassword: '' };
 
 export default function App() {
@@ -45,7 +46,8 @@ export default function App() {
   }
   if (session && screen === 'booking' && session.roles.includes('ROLE_USER')) return <BookingDashboard token={session.token} onSignOut={signOut} onAdmin={() => changeScreen('admin')} onAppointments={() => changeScreen('appointments')} isAdmin={session.roles.includes('ROLE_ADMIN')} />;
   if (session && screen === 'appointments' && session.roles.includes('ROLE_USER')) return <MyAppointmentsDashboard token={session.token} onSignOut={signOut} onBooking={() => changeScreen('booking')} />;
-  if (session && screen === 'admin' && session.roles.includes('ROLE_ADMIN')) return <AdminDashboard token={session.token} onSignOut={signOut} onBooking={() => changeScreen('booking')} isUser={session.roles.includes('ROLE_USER')} />;
+  if (session && screen === 'admin' && session.roles.includes('ROLE_ADMIN')) return <AdminDashboard token={session.token} onSignOut={signOut} onBooking={() => changeScreen('booking')} onCatalogs={() => changeScreen('catalogs')} isUser={session.roles.includes('ROLE_USER')} />;
+  if (session && screen === 'catalogs' && session.roles.includes('ROLE_ADMIN')) return <CatalogsDashboard token={session.token} onSignOut={signOut} onBack={() => changeScreen('admin')} />;
   if (session && screen === 'agenda' && session.roles.includes('ROLE_PROFESSIONAL')) return <ProfessionalAgendaDashboard token={session.token} onSignOut={signOut} />;
   if (screen === 'forgot-password') return <ForgotPasswordScreen onBack={() => changeScreen('login')} onRequested={() => changeScreen('reset-password')} />;
   if (screen === 'reset-password') return <ResetPasswordScreen onBack={() => changeScreen('login')} onDone={() => changeScreen('login')} />;
@@ -147,13 +149,13 @@ export function ResetPasswordScreen({ onBack, onDone }: { onBack: () => void; on
     </div></section></main></div>;
 }
 
-export function AdminDashboard({ token, onSignOut, onBooking, isUser }: { token: string; onSignOut: () => void; onBooking: () => void; isUser: boolean }) {
+export function AdminDashboard({ token, onSignOut, onBooking, onCatalogs, isUser }: { token: string; onSignOut: () => void; onBooking: () => void; onCatalogs: () => void; isUser: boolean }) {
   const [items, setItems] = useState<PendingAppointment[]>([]); const [notice, setNotice] = useState<Notice>(null); const [loading, setLoading] = useState(true); const [reasons, setReasons] = useState<Record<string, string>>({});
   const [filters, setFilters] = useState<AdminInboxFilters>({});
   const load = useCallback(() => { setLoading(true); bookingApi.pending(token, filters).then(setItems).catch((error) => setNotice({ type: 'error', text: error instanceof Error ? error.message : 'No fue posible cargar solicitudes.' })).finally(() => setLoading(false)); }, [token, filters]);
   useEffect(load, [load]);
   async function decide(item: PendingAppointment, decision: 'APPROVE' | 'REJECT') { const reason = reasons[item.id]?.trim(); if (decision === 'REJECT' && !reason) { setNotice({ type: 'error', text: 'El motivo es obligatorio para rechazar.' }); return; } try { await bookingApi.decide(token, item.id, decision, reason); setNotice({ type: 'success', text: decision === 'APPROVE' ? 'Solicitud aprobada.' : 'Solicitud rechazada y franja liberada.' }); load(); } catch (error) { setNotice({ type: 'error', text: error instanceof Error ? error.message : 'No fue posible decidir la solicitud.' }); } }
-  return <PortalLayout title="Solicitudes pendientes" onSignOut={onSignOut} action={isUser ? <button onClick={onBooking}>Buscar cita</button> : undefined}>{notice && <NoticeBox notice={notice} />}<section aria-labelledby="specialized-heading"><h2 id="specialized-heading">Solicitudes de cita especializada</h2><InboxFilterBar token={token} filters={filters} onChange={setFilters} />{loading ? <p>Cargando solicitudes…</p> : items.length === 0 ? <p>No hay solicitudes especializadas pendientes.</p> : <div className="pending-list">{items.map((item) => <article className="pending-card" key={item.id}><h3>{item.specialtyName}</h3><p>{item.patientName} · {item.professionalName}</p><p>{item.locationName} · {formatDateTime(item.startAt)} · {item.durationMinutes} min</p><div className="decision-row"><button className="primary-button" onClick={() => decide(item, 'APPROVE')}>Aprobar</button><label className="inline-field">Motivo de rechazo<input aria-label={`Motivo de rechazo para ${item.id}`} value={reasons[item.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [item.id]: event.target.value })} /></label><button className="danger-button" disabled={!reasons[item.id]?.trim()} onClick={() => decide(item, 'REJECT')}>Rechazar</button></div><StatusHistoryToggle token={token} appointmentId={item.id} /></article>)}</div>}</section><RescheduleInbox token={token} /></PortalLayout>;
+  return <PortalLayout title="Solicitudes pendientes" onSignOut={onSignOut} action={<>{isUser && <button onClick={onBooking}>Buscar cita</button>}<button onClick={onCatalogs}>Catálogos</button></>}>{notice && <NoticeBox notice={notice} />}<section aria-labelledby="specialized-heading"><h2 id="specialized-heading">Solicitudes de cita especializada</h2><InboxFilterBar token={token} filters={filters} onChange={setFilters} />{loading ? <p>Cargando solicitudes…</p> : items.length === 0 ? <p>No hay solicitudes especializadas pendientes.</p> : <div className="pending-list">{items.map((item) => <article className="pending-card" key={item.id}><h3>{item.specialtyName}</h3><p>{item.patientName} · {item.professionalName}</p><p>{item.locationName} · {formatDateTime(item.startAt)} · {item.durationMinutes} min</p><div className="decision-row"><button className="primary-button" onClick={() => decide(item, 'APPROVE')}>Aprobar</button><label className="inline-field">Motivo de rechazo<input aria-label={`Motivo de rechazo para ${item.id}`} value={reasons[item.id] ?? ''} onChange={(event) => setReasons({ ...reasons, [item.id]: event.target.value })} /></label><button className="danger-button" disabled={!reasons[item.id]?.trim()} onClick={() => decide(item, 'REJECT')}>Rechazar</button></div><StatusHistoryToggle token={token} appointmentId={item.id} /></article>)}</div>}</section><RescheduleInbox token={token} /></PortalLayout>;
 }
 
 /**
@@ -218,7 +220,7 @@ export function RescheduleInbox({ token }: { token: string }) {
   </section>;
 }
 
-function PortalLayout({ title, onSignOut, action, children }: { title: string; onSignOut: () => void; action?: React.ReactNode; children: React.ReactNode }) { return <div className="portal-shell"><header className="topbar"><span className="brand"><span className="brand-mark">✚</span><span>MediSchedule</span></span><nav aria-label="Sesión">{action}<button onClick={onSignOut}>Cerrar sesión</button></nav></header><main className="portal-content"><p className="eyebrow">PORTAL DE CITAS</p><h1>{title}</h1>{children}</main></div>; }
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) { return <label className="field" htmlFor={htmlFor}><span>{label}</span>{children}</label>; }
-function NoticeBox({ notice }: { notice: NonNullable<Notice> }) { return <div className={`notice ${notice.type}`} role={notice.type === 'error' ? 'alert' : 'status'}>{notice.text}</div>; }
+export function PortalLayout({ title, onSignOut, action, children }: { title: string; onSignOut: () => void; action?: React.ReactNode; children: React.ReactNode }) { return <div className="portal-shell"><header className="topbar"><span className="brand"><span className="brand-mark">✚</span><span>MediSchedule</span></span><nav aria-label="Sesión">{action}<button onClick={onSignOut}>Cerrar sesión</button></nav></header><main className="portal-content"><p className="eyebrow">PORTAL DE CITAS</p><h1>{title}</h1>{children}</main></div>; }
+export function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) { return <label className="field" htmlFor={htmlFor}><span>{label}</span>{children}</label>; }
+export function NoticeBox({ notice }: { notice: NonNullable<Notice> }) { return <div className={`notice ${notice.type}`} role={notice.type === 'error' ? 'alert' : 'status'}>{notice.text}</div>; }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat('es-CO', { timeZone: 'America/Bogota', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(`${value}-05:00`)); }
